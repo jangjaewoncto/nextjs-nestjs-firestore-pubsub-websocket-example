@@ -8,10 +8,10 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start": "GOOGLE_APPLICATION_CREDENTIALS=./secrets/service-account.json nest start",
+    "start:dev": "GOOGLE_APPLICATION_CREDENTIALS=./secrets/service-account.json nest start --watch",
+    "start:debug": "GOOGLE_APPLICATION_CREDENTIALS=./secrets/service-account.json nest start --debug --watch",
+    "start:prod": "GOOGLE_APPLICATION_CREDENTIALS=./secrets/service-account.json node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -25,6 +25,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-ws": "^11.1.2",
     "@nestjs/websockets": "^11.1.2",
+    "firebase-admin": "^13.4.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "ws": "^8.18.2"

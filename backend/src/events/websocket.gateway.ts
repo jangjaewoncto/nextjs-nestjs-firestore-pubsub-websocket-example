@@ -1,20 +1,21 @@
 import {
-  SubscribeMessage,
   WebSocketGateway,
   OnGatewayInit,
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  MessageBody,
-  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { IncomingMessage } from 'http'; // To type the request object
 import { Server, WebSocket } from 'ws'; // Import Socket.IO types
+import { subscribe, unsubscribe } from 'src/model/pubsub';
+
+let connectionIdCounter = 0;
 
 // By default, gateways listen on the same port as your HTTP server.
 // You can specify a different port: @WebSocketGateway(8080, { ... })
-// You can also specify a namespace: @WebSocketGateway({ namespace: '/chat' })
+// You can also spe
+// cify a namespace: @WebSocketGateway({ namespace: '/chat' })
 @WebSocketGateway({
   cors: {
     origin: '*', // Allow all origins, adjust for production
@@ -38,7 +39,7 @@ export class WebsocketGateway
   // We need to check if the client is authenticated!
   // We need to find the http connection and check the header! to authenticate!
 
-  handleConnection(
+  async handleConnection(
     client: WebSocket,
     request: IncomingMessage,
     // ...args: any[]
@@ -54,40 +55,33 @@ export class WebsocketGateway
     this.logger.log(`Client connected: ${token}`);
     client.emit('connection', 'Successfully connected to server!');
 
+    const connectionId = `con:${connectionIdCounter++}`;
+    // attach userid to the websocket to maintain state.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    (client as any).userId = token;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    (client as any).connectionId = connectionId;
+
+    await subscribe<any>(connectionId, token, (message) => {
+      client.send(JSON.stringify(message));
+    });
     //
+
+    client.on('message', (message) => {
+      console.log(message);
+    });
   }
 
-  // Importante!
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   handleDisconnect(client: WebSocket) {
-    this.logger.log(`Client disconnected:`);
-  }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const userId = (client as any).userId as string;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const connectionId = (client as any).connectionId as string;
 
-  // We're not using this method!
-  // Listen for messages with the event name 'messageToServer'
-  @SubscribeMessage('eventsToServer')
-  handleMessage(
-    @MessageBody() data: string, // Extracts the payload of the message
-    @ConnectedSocket() client: WebSocket, // Injects the client socket instance
-  ): void {
-    // Can return data for acknowledgements
-    this.logger.log(`Message from client : ${data}`);
+    if (userId) {
+      unsubscribe(connectionId, userId);
+    }
 
-    // Emit a message back to the specific client who sent this message
-    client.emit('messageToClient', `Server received your message: ${data}`);
-
-    // Or broadcast to all connected clients (except sender by default with client.broadcast.emit)
-    // this.server.emit('messageToClient', `Broadcast from server: A client sent: ${data}`);
-
-    // Or broadcast to all clients including the sender
-    // this.server.emit('messageToClient', `Broadcast to everyone: ${data}`);
-
-    // For acknowledgements, return the value
-    // return { event: 'messageToServer', data: `Acknowledged: ${data}` };
-  }
-
-  // Example: Emitting an event periodically (e.g., from a service)
-  sendTimeToAllClients() {
-    this.server.emit('timeUpdate', new Date().toLocaleTimeString());
+    this.logger.log(`Client ${userId} disconnected:`);
   }
 }
